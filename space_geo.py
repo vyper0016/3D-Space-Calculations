@@ -49,6 +49,7 @@ class Vector:
             self.y = pt2.y - pt1.y
             self.z = pt2.z - pt1.z
             self.mat = np.array([[self.x], [self.y], [self.z]])
+            self.norm = linalg.norm(self.mat)
             return
         if [x, y, z] != [None, None, None]:
             if pt1 or pt2:
@@ -59,6 +60,7 @@ class Vector:
             self.y = y
             self.z = z
             self.mat = np.array([[self.x], [self.y], [self.z]])
+            self.norm = linalg.norm(self.mat)
         else:
             raise SyntaxError
 
@@ -68,7 +70,7 @@ class Vector:
 
 
 class Plane:
-    def __init__(self, name: str, pt1: Point = None, pt2: Point = None, pt3: Point = None,
+    def __init__(self, name: str = 'P', pt1: Point = None, pt2: Point = None, pt3: Point = None,
                  vec1: Vector = None, vec2: Vector = None,
                  a: float = None, b: float = None, c: float = None, d: float = None,
                  normal_vector: Vector = None):
@@ -173,7 +175,7 @@ class Plane:
 
 
 class Line:
-    def __init__(self, parameter: str, pt: Point = None, vec: Vector = None, pt2: Point = None, name: str = '',
+    def __init__(self, parameter: str = 'α', pt: Point = None, vec: Vector = None, pt2: Point = None, name: str = '',
                  p1: Plane=None, p2: Plane=None):
         tr = True
         self.name = name
@@ -305,6 +307,10 @@ def planes_parallel(p1: Plane, p2: Plane):
     return False
 
 
+def middle_point(pt1: Point, pt2: Point):
+    return Point(f'{pt1.name}*{pt2.name}', (pt1.x + pt2.x) / 2, (pt1.y + pt2.y) / 2, (pt1.z + pt2.z) / 2)
+
+
 def point_in_line(pt: Point, line: Line):
 
     i = None
@@ -325,6 +331,12 @@ def point_in_line(pt: Point, line: Line):
                 return False
 
     return True
+
+
+def point_in_plane(pt: Point, p: Plane):
+    if pt.x * p.a + pt.y * p.b + pt.z * p.c + p.d == 0:
+        return True
+    return False
 
 
 def relation_two_lines(l1: Line, l2: Line):
@@ -348,17 +360,86 @@ def relation_two_lines(l1: Line, l2: Line):
     return 'non secant'
 
 
-H = Point('H', 0, 1, 3)
-B = Point('B', 0, 0, 6)
-dr = Line('α', H, pt2=B, name='L1')
-A = Point('A', 1, 0, 6)
-print(dr)
+def relation_two_planes(p1: Plane, p2: Plane):
+    if [p1.a, p1.b, p1.c, p1.d] == [p2.a, p2.b, p2.c, p2.d]:
+        return 'confendus'
 
-d2 = Line('β', pt=Point('sz', 1, 2, 3), vec=Vector(x=1, y=1, z=0), name='L2')
+    if planes_parallel(p1, p2):
+        return 'parallel'
 
-print()
-print(d2)
-print(relation_two_lines(dr, d2))
+    if vectors_orthogonal(p1.normal_vector, p2.normal_vector):
+        return 'Perpendicular'
+
+    return 'secants'
 
 
+def relation_plane_line(p: Plane, l: Line, proj=False):
+    if vectors_orthogonal(p.normal_vector, l.vec):
+        if point_in_plane(l.pt, p):
+            return 'confendus'
+        return 'parallel'
+
+    x, y, z = l.pt.x, l.pt.y, l.pt.z
+    e, f, g = l.vec.x, l.vec.y, l.vec.z
+    a, b, c, d = p.a, p.b, p.c, p.d
+
+    alpha = (-a*x - b*y - c*z - d) / (a*e + b*f + c*g)
+
+    k = l.point_from_line(alpha)
+
+    if proj:
+        k.name = 'H'
+
+    if vectors_collinear(l.vec, p.normal_vector):
+        return 'perpendicular', k
+
+    return 'secant', k
+
+
+def mediator_plane(pt1: Point, pt2: Point):
+    i = middle_point(pt1, pt2)
+    nv = Vector(pt1, pt1)
+    return Plane(name=f'Pmed[{pt1.name}{pt2.name}]', pt1=i, normal_vector=nv)
+
+
+def distance_two_points(pt1: Point, pt2: Point):
+    vec = Vector(pt1, pt2)
+    return vec.norm
+
+
+def distance_point_plane(pt: Point, p: Plane):
+    if point_in_plane(pt, p):
+        return 0
+
+    a, b, c, d = p.a, p.b, p.c, p.d
+    x, y, z = pt.x, pt.y, pt.z
+    return abs(a*x + b*y + c*z + d) / p.normal_vector.norm
+
+
+def distance_point_line(pt: Point, l: Line):
+    if point_in_line(pt, l):
+        return 0
+
+    h = orthogonal_projection_point_line(pt, l)
+    v = Vector(h, pt)
+
+    return v.norm
+
+
+def orthogonal_projection_point_plane(pt: Point, p: Plane):
+    if point_in_plane(pt, p):
+        return pt
+
+    li = Line(pt=pt, vec=p.normal_vector)
+
+    return relation_plane_line(p, li, True)[1]
+
+
+def orthogonal_projection_point_line(pt: Point, l: Line):
+    if point_in_line(pt, l):
+        return pt
+
+    p = Plane(normal_vector=l.vec, pt1=pt)
+
+    return relation_plane_line(p, l, True)[1]
 
