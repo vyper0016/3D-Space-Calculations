@@ -176,7 +176,7 @@ class Plane:
 
 class Line:
     def __init__(self, parameter: str = 'α', pt: Point = None, vec: Vector = None, pt2: Point = None, name: str = '',
-                 p1: Plane=None, p2: Plane=None):
+                 p1: Plane = None, p2: Plane = None):
         tr = True
         self.name = name
         if pt and pt2 and tr:
@@ -186,13 +186,13 @@ class Line:
                 self.name = f'({pt.name}{pt2.name})'
 
         if p1 and p2:
-            k = p2.c - (p1.c*p2.b) / p1.b
+            k = p2.c - (p1.c * p2.b) / p1.b
             x = 0
-            z = (((p1.d*p2.b) / p1.d) - p2.d) / k
-            y = - p1.d - (p1.d*p2.b*p1.c - p2.d) / (p1.c * k)
+            z = (((p1.d * p2.b) / p1.d) - p2.d) / k
+            y = - p1.d - (p1.d * p2.b * p1.c - p2.d) / (p1.c * k)
 
             a = 1
-            b = ((p2.b*p1.a*p1.c) / p1.b - p1.c * p2.a) / k
+            b = ((p2.b * p1.a * p1.c) / p1.b - p1.c * p2.a) / k
             c = (((p2.b * p1.a) / p1.b) - p2.a) / k
 
             pt = Point(name='PT{', x=x, y=y, z=z)
@@ -222,6 +222,58 @@ class Line:
                f'z = {eq_mk_line(self.a[2], self.b[2], self.parameter)}'
 
 
+class Diameter:
+    def __init__(self, pt1: Point, pt2: Point):
+        self.pt1 = pt1
+        self.pt2 = pt2
+        self.center = middle_point(self.pt1, self.pt2)
+        self.length = distance_two_points(self.pt1, self.pt2)
+
+    def __repr__(self):
+        return f'[{self.pt1.name}{self.pt2.name}]'
+
+
+class Circle:
+    def __init__(self, center: Point, r: float, name: str = 'C'):
+        self.center = center
+        self.r = r
+        self.name = name
+
+    def __repr__(self):
+        return f'{self.name}({self.center.name}, {self.r})'
+
+    def __str__(self):
+        return self.__repr__()
+
+
+class Sphere:
+    def __init__(self, name: str = 'S', center: Point = None, r: float = None, d: Diameter = None):
+        if [center, r] != [None, None] and d is not None:
+            raise RedundantArguments
+
+        if [center, r, d] == [None, None, None]:
+            raise SyntaxError
+
+        self.name = name
+
+        if [center, r] != [None, None]:
+            self.center = center
+            self.r = r
+
+        elif d is not None:
+            self.center = d.center
+            self.r = d.length / 2
+
+        if self.r < 0:
+            raise AttributeError
+
+        self.eq = eq_mk_sphere(-center.x, 'x') + eq_mk_sphere(-center.y, 'y') + eq_mk_sphere(-center.z, 'z') \
+            + f' = {self.r ** 2}'
+
+    def __repr__(self):
+        return f'{self.name}({self.center}, {self.r})'
+
+
 def vectors_collinear(vec1: Vector, vec2: Vector):
     a = np.array([[vec1.x, vec2.x], [vec1.y, vec2.y]])
     b = np.array([[vec1.x, vec2.x], [vec1.z, vec2.z]])
@@ -229,7 +281,7 @@ def vectors_collinear(vec1: Vector, vec2: Vector):
     det_a = linalg.det(a)
     det_b = linalg.det(b)
     det_c = linalg.det(c)
-#    if list(map(lambda x: round(x), [det_a, det_b, det_c]))
+    #    if list(map(lambda x: round(x), [det_a, det_b, det_c]))
     if [det_a, det_b, det_c] == [0, 0, 0]:
         return True
 
@@ -243,7 +295,6 @@ def vectors_orthogonal(vec1: Vector, vec2: Vector):
 
 
 def dress_num(n):
-
     if n == 1:
         return '+ '
 
@@ -259,7 +310,6 @@ def dress_num(n):
 
 
 def eq_mk(var: str = '', n=0.):
-
     if n == 0:
         return ''
 
@@ -271,9 +321,11 @@ def eq_mk(var: str = '', n=0.):
     return ' ' + dress_num(n) + var
 
 
-def eq_mk_line(a: np.ndarray, b: np.ndarray, par: str):
-    a = a.item()
-    b = b.item()
+def eq_mk_line(a, b, par: str):
+    if [type(a), type(b)] == [np.ndarray, np.ndarray]:
+        a = a.item()
+        b = b.item()
+
     if [a, b] == [0, 0]:
         return '0'
 
@@ -301,6 +353,27 @@ def eq_mk_line(a: np.ndarray, b: np.ndarray, par: str):
         return str(a) + ' - ' + str(abs(b)) + par
 
 
+def eq_mk_sphere(n: float, var: str):
+    if var == 'x':
+        if n == 0:
+            return 'x²'
+
+        if n < 0:
+            return f'(x - {abs(n)})²'
+
+        if n > 0:
+            return '(x + ' + str(n) + ')²'
+
+    if n == 0:
+        return ' + ' + var + '²'
+
+    if n < 0:
+        return f' + ({var} - {abs(n)})²'
+
+    if n > 0:
+        return f' + ({var} + {n})²'
+
+
 def planes_parallel(p1: Plane, p2: Plane):
     if vectors_collinear(p1.normal_vector, p2.normal_vector):
         return True
@@ -312,7 +385,6 @@ def middle_point(pt1: Point, pt2: Point):
 
 
 def point_in_line(pt: Point, line: Line):
-
     i = None
 
     for v, a, p in zip([line.vec.x, line.vec.y, line.vec.z], [line.pt.x, line.pt.y, line.pt.z], [pt.x, pt.y, pt.z]):
@@ -383,7 +455,7 @@ def relation_plane_line(p: Plane, l: Line, proj=False):
     e, f, g = l.vec.x, l.vec.y, l.vec.z
     a, b, c, d = p.a, p.b, p.c, p.d
 
-    alpha = (-a*x - b*y - c*z - d) / (a*e + b*f + c*g)
+    alpha = (-a * x - b * y - c * z - d) / (a * e + b * f + c * g)
 
     k = l.point_from_line(alpha)
 
@@ -413,7 +485,7 @@ def distance_point_plane(pt: Point, p: Plane):
 
     a, b, c, d = p.a, p.b, p.c, p.d
     x, y, z = pt.x, pt.y, pt.z
-    return abs(a*x + b*y + c*z + d) / p.normal_vector.norm
+    return abs(a * x + b * y + c * z + d) / p.normal_vector.norm
 
 
 def distance_point_line(pt: Point, l: Line):
@@ -442,4 +514,5 @@ def orthogonal_projection_point_line(pt: Point, l: Line):
     p = Plane(normal_vector=l.vec, pt1=pt)
 
     return relation_plane_line(p, l, True)[1]
+
 
