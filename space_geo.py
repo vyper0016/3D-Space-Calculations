@@ -274,6 +274,10 @@ class Sphere:
         return f'{self.name}({self.center}, {self.r})'
 
 
+def scalar(vec1: Vector, vec2: Vector):
+    return np.tensordot(vec1.mat, vec2.mat)
+
+
 def vectors_collinear(vec1: Vector, vec2: Vector):
     a = np.array([[vec1.x, vec2.x], [vec1.y, vec2.y]])
     b = np.array([[vec1.x, vec2.x], [vec1.z, vec2.z]])
@@ -289,7 +293,7 @@ def vectors_collinear(vec1: Vector, vec2: Vector):
 
 
 def vectors_orthogonal(vec1: Vector, vec2: Vector):
-    if np.tensordot(vec1.mat, vec2.mat) == 0:
+    if scalar(vec1, vec2) == 0:
         return True
     return False
 
@@ -514,5 +518,4 @@ def orthogonal_projection_point_line(pt: Point, l: Line):
     p = Plane(normal_vector=l.vec, pt1=pt)
 
     return relation_plane_line(p, l, True)[1]
-
 
