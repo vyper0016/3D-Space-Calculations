@@ -20,7 +20,8 @@ class Point:
         self.name = name
 
     def __repr__(self):
-        return f'{self.name} ({round(self.x, RN)}, {round(self.y, RN)}, {round(self.z, RN)})'
+        a = [self.x, self.y, self.z] if not ROUND else [round(self.x, RN), round(self.y, RN), round(self.z, RN)]
+        return f'{self.name} ({a[0]}, {a[1]}, {a[2]})'
 
     __str__ = __repr__
 
@@ -76,7 +77,8 @@ class Vector:
 
     def __repr__(self):
         i = '\t' * (len(self.name) // 4 + 1)
-        return f'{self.name}\t{round(self.x, RN)}\n{i}{round(self.y, RN)}\n{i}{round(self.z, RN)}'
+        a = [self.x, self.y, self.z] if not ROUND else [round(self.x, RN), round(self.y, RN), round(self.z, RN)]
+        return f'{self.name}\t{a[0]}\n{i}{a[1]}\n{i}{a[2]}'
 
     def __eq__(self, other):
         return self.norm == other.norm and vectors_collinear(self, other)
@@ -87,7 +89,7 @@ class Vector:
     def __sub__(self, other):
         return Vector(x=self.x - other.x, y=self.y - other.y, z=self.z - other.z)
 
-    def __mul__(self, other):
+    def __mul__(self, other):   # Returns the dot product
         return scalar(self, other)
     __rmul__ = __mul__
 
