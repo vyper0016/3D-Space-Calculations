@@ -1,6 +1,9 @@
 import numpy as np
 from numpy import linalg
+from math import sqrt
 
+ROUND = True
+RN = 3 # ndigits to round to
 
 class RedundantArguments(SyntaxError):
     def __init__(self):
@@ -8,7 +11,7 @@ class RedundantArguments(SyntaxError):
 
 
 class Point:
-    def __init__(self, name, x: float, y: float, z: float):
+    def __init__(self, x: float, y: float, z: float, name=''):
         if type(x) == np.ndarray:
             [x, y, z] = list(map(lambda x: x.item(), [x, y, z]))
         self.x = x
@@ -17,10 +20,17 @@ class Point:
         self.name = name
 
     def __repr__(self):
-        return f'{self.name} ({self.x}, {self.y}, {self.z})'
+        return f'{self.name} ({round(self.x, RN)}, {round(self.y, RN)}, {round(self.z, RN)})'
 
-    def __str__(self):
-        return f'{self.name} ({self.x}, {self.y}, {self.z})'
+    __str__ = __repr__
+
+    def __eq__(self, other):
+        if other is None:
+            return self is None
+        return [self.x, self.y, self.z] == [other.x, other.y, other.z]
+
+    def __mul__(self, other):
+        return middle_point(self, other)
 
 
 class Vector:
@@ -66,7 +76,20 @@ class Vector:
 
     def __repr__(self):
         i = '\t' * (len(self.name) // 4 + 1)
-        return f'{self.name}\t{self.x}\n{i}{self.y}\n{i}{self.z}'
+        return f'{self.name}\t{round(self.x, RN)}\n{i}{round(self.y, RN)}\n{i}{round(self.z, RN)}'
+
+    def __eq__(self, other):
+        return self.norm == other.norm and vectors_collinear(self, other)
+
+    def __add__(self, other):
+        return Vector(x=self.x + other.x, y=self.y + other.y, z=self.z + other.z)
+
+    def __sub__(self, other):
+        return Vector(x=self.x - other.x, y=self.y - other.y, z=self.z - other.z)
+
+    def __mul__(self, other):
+        return scalar(self, other)
+    __rmul__ = __mul__
 
 
 class Plane:
@@ -173,9 +196,12 @@ class Plane:
             sv = ' ' + dress_num(self.d)
         return f'{self.name}: {eq_mk("x", self.a) + eq_mk("y", self.b) + eq_mk("z", self.c) + sv} = 0'
 
+    def __eq__(self, other):
+        return relation_two_planes(self, other) == 'confendus'
+
 
 class Line:
-    def __init__(self, parameter: str = 'α', pt: Point = None, vec: Vector = None, pt2: Point = None, name: str = '',
+    def __init__(self, parameter: str = 'al', pt: Point = None, vec: Vector = None, pt2: Point = None, name: str = '',
                  p1: Plane = None, p2: Plane = None):
         tr = True
         self.name = name
@@ -210,9 +236,9 @@ class Line:
             self.a = np.array([[pt.x], [pt.y], [pt.z]])
             self.b = vec.mat
 
-    def point_from_line(self, parameter: float):
+    def point_from_line(self, parameter: float) -> Point: 
         c = self.a + parameter * self.b
-        pt = Point('PT{' + f'{self.parameter} = {parameter}' + '}', c[0], c[1], c[2])
+        pt = Point(name='PT{' + f'{self.parameter} = {parameter}' + '}', x=c[0], y=c[1], z=c[2])
         return pt
 
     def __repr__(self):
@@ -220,6 +246,9 @@ class Line:
         return f'{self.name}\tx = {eq_mk_line(self.a[0], self.b[0], self.parameter)}\n{i}' \
                f'y = {eq_mk_line(self.a[1], self.b[1], self.parameter)}\n{i}' \
                f'z = {eq_mk_line(self.a[2], self.b[2], self.parameter)}'
+
+    def __eq__(self, other):
+        return vectors_collinear(self.vec, other.vec) and point_in_line(self.pt, other)
 
 
 class Diameter:
@@ -240,11 +269,11 @@ class Circle:
         self.name = name
 
     def __repr__(self):
-        return f'{self.name}({self.center.name}, {self.r})'
+        r = self.r if not ROUND else round(self.r, RN)
+        return f'{self.name}({self.center.name}, {r})'
 
-    def __str__(self):
-        return self.__repr__()
-
+    __str__ = __repr__
+        
 
 class Sphere:
     def __init__(self, name: str = 'S', center: Point = None, r: float = None, d: Diameter = None):
@@ -267,7 +296,7 @@ class Sphere:
         if self.r < 0:
             raise AttributeError
 
-        self.eq = eq_mk_sphere(-center.x, 'x') + eq_mk_sphere(-center.y, 'y') + eq_mk_sphere(-center.z, 'z') \
+        self.equation = eq_mk_sphere(-self.center.x, 'x') + eq_mk_sphere(-self.center.y, 'y') + eq_mk_sphere(-self.center.z, 'z') \
             + f' = {self.r ** 2}'
 
     def __repr__(self):
@@ -317,6 +346,9 @@ def eq_mk(var: str = '', n=0.):
     if n == 0:
         return ''
 
+    if ROUND:
+        n = round(n, RN)
+
     if var == 'x' and n > 0:
         if n == 1:
             return 'x'
@@ -332,6 +364,9 @@ def eq_mk_line(a, b, par: str):
 
     if [a, b] == [0, 0]:
         return '0'
+
+    if ROUND:
+        a, b = round(a, RN), round(b, RN)
 
     if a == 0:
         if b == 1:
@@ -358,6 +393,8 @@ def eq_mk_line(a, b, par: str):
 
 
 def eq_mk_sphere(n: float, var: str):
+    if ROUND:
+        n = round(n, RN)
     if var == 'x':
         if n == 0:
             return 'x²'
@@ -385,10 +422,10 @@ def planes_parallel(p1: Plane, p2: Plane):
 
 
 def middle_point(pt1: Point, pt2: Point):
-    return Point(f'{pt1.name}*{pt2.name}', (pt1.x + pt2.x) / 2, (pt1.y + pt2.y) / 2, (pt1.z + pt2.z) / 2)
+    return Point(x=(pt1.x + pt2.x) / 2, y=(pt1.y + pt2.y) / 2, z=(pt1.z + pt2.z) / 2, name=f'{pt1.name}*{pt2.name}')
 
 
-def point_in_line(pt: Point, line: Line):
+def point_in_line(pt: Point, line: Line) -> bool:
     i = None
 
     for v, a, p in zip([line.vec.x, line.vec.y, line.vec.z], [line.pt.x, line.pt.y, line.pt.z], [pt.x, pt.y, pt.z]):
@@ -472,9 +509,24 @@ def relation_plane_line(p: Plane, l: Line, proj=False):
     return 'secant', k
 
 
+def relation_plane_sphere(p: Plane, s: Sphere):
+    d = distance_point_plane(s.center, p)
+    r = s.r
+    if d > r:
+        return 'disjoints'
+
+    if d == r:
+        return 'tangents', orthogonal_projection_point_plane(s.center, p)
+
+    if point_in_plane(s.center, p):
+        return 'mediator', Circle(s.center, r)
+
+    return 'secants', Circle(orthogonal_projection_point_plane(s.center, p), sqrt(r**2 - d**2))
+
+
 def mediator_plane(pt1: Point, pt2: Point):
     i = middle_point(pt1, pt2)
-    nv = Vector(pt1, pt1)
+    nv = Vector(pt1, pt2)
     return Plane(name=f'Pmed[{pt1.name}{pt2.name}]', pt1=i, normal_vector=nv)
 
 
@@ -519,3 +571,18 @@ def orthogonal_projection_point_line(pt: Point, l: Line):
 
     return relation_plane_line(p, l, True)[1]
 
+
+if __name__ == '__main__':
+    B = Point(0,0,2)
+    C = Point(1,2,0)
+    A = Point(0,2,0)
+    O = Point(0,0,0)
+    I = O*A
+    BC = Line(pt=B,pt2=C, name='(BC)')
+    H = orthogonal_projection_point_line(I, BC)
+    P = mediator_plane(H, I)
+    S = Sphere(d=Diameter(O, A))
+    print(S)
+    C = relation_plane_sphere(P, S)[1]
+    print(C.r)
+    print(H)
