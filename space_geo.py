@@ -3,7 +3,8 @@ from numpy import linalg
 from math import sqrt
 
 ROUND = True
-RN = 3 # ndigits to round to
+if ROUND:    
+    RN = 3 # ndigits to round to
 
 class RedundantArguments(SyntaxError):
     def __init__(self):
